@@ -1,0 +1,6 @@
+﻿package-as: ErrorFilter
+
+enable-nolib-creation: no
+
+ignore:
+ - .pkgmeta
