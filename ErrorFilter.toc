@@ -1,0 +1,10 @@
+## Interface: 30300
+## X-Compatible-With: 40000
+## Title: ErrorFilter
+## Notes: Filters the errors dislayed in the UIErrorsFrame.
+## Version: 2.0
+## Author: iceeagle
+## SavedVariables: DB_Options, DB_Filters
+## DefaultState: enabled
+
+ErrorFilter.lua
