@@ -43,7 +43,6 @@ end)
 -- Replace original error handler
 local original_OnEvent = UIErrorsFrame:GetScript('OnEvent')
 UIErrorsFrame:SetScript('OnEvent', function(self, event, ...)
-	print(event, ...)
 	if self[event] then
 		return self[event](self, event, ...)
 	else
@@ -95,7 +94,6 @@ function UIErrorsFrame:UI_ERROR_MESSAGE(event, name, ...)
 	if (DB_Options.isEnabled and DB_Options.isShown and DB_Filters[1]) then
 		for k, v in next, DB_Filters do
 			if( string.find( string.lower(name), v ) ) then
-				--print("found: ", name)
 				return
 			end
 		end
