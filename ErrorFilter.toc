@@ -1,5 +1,4 @@
-## Interface: 30300
-## X-Compatible-With: 40000
+## Interface: 40000
 ## Title: ErrorFilter
 ## Notes: Filters the errors dislayed in the UIErrorsFrame.
 ## Version: 1.7
