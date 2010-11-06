@@ -1,195 +1,210 @@
 --------------------------------------------------------------------------------------------------------
+--                                         AceAddon init                                              --
+--------------------------------------------------------------------------------------------------------
+ErrorFilter = LibStub("AceAddon-3.0"):NewAddon("ErrorFilter", "AceEvent-3.0")
+local L = LibStub("AceLocale-3.0"):GetLocale("ErrorFilter")
+local AceConfig = LibStub("AceConfig-3.0")
+local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+local AceDB = LibStub("AceDB-3.0")
+local AceDBOptions = LibStub("AceDBOptions-3.0")
+
+--------------------------------------------------------------------------------------------------------
 --                                        ErrorFilter variables                                       --
 --------------------------------------------------------------------------------------------------------
-local ErrorFilter_Options = 
-{
-	isEnabled = true,
-	isShown = true,
+local profileDB
+local DATABASE_DEFAULTS = {
+	profile = {
+		mode = 1,
+		filters = {
+			[ERR_ABILITY_COOLDOWN] = true,
+			[ERR_ATTACK_CHANNEL] = false,
+			[ERR_ATTACK_CHARMED] = false,
+			[ERR_ATTACK_CONFUSED] = false,
+			[ERR_ATTACK_DEAD] = false,
+			[ERR_ATTACK_FLEEING] = false,
+			[ERR_ATTACK_MOUNTED] = true,
+			[ERR_ATTACK_PACIFIED] = false,
+			[ERR_ATTACK_STUNNED] = false,
+			[ERR_AUTOFOLLOW_TOO_FAR] = false,
+			[ERR_BADATTACKFACING] = false,
+			[ERR_BADATTACKPOS] = true,
+			[ERR_BATTLEGROUND_INFO_THROTTLED] = true,
+			[ERR_CANTATTACK_NOTSTANDING] = false,
+			[ERR_CLIENT_LOCKED_OUT] = false,
+			[ERR_GENERIC_NO_TARGET] = true,
+			[ERR_GENERIC_NO_VALID_TARGETS] = true,
+			[ERR_GENERIC_STUNNED] = false,
+			[ERR_INVALID_ATTACK_TARGET] = true,
+			[ERR_ITEM_COOLDOWN] = true,
+			[ERR_NOEMOTEWHILERUNNING] = false,
+			[ERR_NOT_IN_COMBAT] = false,
+			[ERR_NOT_WHILE_DISARMED] = false,
+			[ERR_NOT_WHILE_FALLING] = false,
+			[ERR_NOT_WHILE_MOUNTED] = false,
+			[ERR_NO_ATTACK_TARGET] = true,
+			[ERR_OUT_OF_ENERGY] = true,
+			[ERR_OUT_OF_FOCUS] = true,
+			[ERR_OUT_OF_MANA] = true,
+			[ERR_OUT_OF_RAGE] = true,
+			[ERR_OUT_OF_RANGE] = true,
+			[ERR_OUT_OF_RUNES] = true,
+			[ERR_OUT_OF_RUNIC_POWER] = true,
+			[ERR_SPELL_COOLDOWN] = true,
+			[ERR_SPELL_OUT_OF_RANGE] = false,
+			[ERR_TOO_FAR_TO_INTERACT] = false,
+			[ERR_USE_BAD_ANGLE] = false,
+			[ERR_USE_CANT_IMMUNE] = false,
+			[SPELL_FAILED_BAD_IMPLICIT_TARGETS] = true,
+			[SPELL_FAILED_BAD_TARGETS] = true,
+			[SPELL_FAILED_CASTER_AURASTATE] = true,
+			[SPELL_FAILED_NO_COMBO_POINTS] = true,
+			[SPELL_FAILED_SPELL_IN_PROGRESS] = true,
+			[SPELL_FAILED_TARGETS_DEAD] = false,
+			[SPELL_FAILED_TARGET_AURASTATE] = true,
+		},
+	},
 }
 
-local ErrorFilter_Filters = 
-{
-	"your target is dead",
-	"there is nothing to attack",
-	"not enough rage",
-	"not enough energy",
-	"that ability requires combo points",
-	"not enough runic power",
-	"not enough runes",
-	"you have no target",
-	"invalid target",
-	"you cannot attack that target",
-	"spell is not ready yet",
-	"ability is not ready yet",
-	"you can't do that yet",
-	"you are too far away",
-	"out of range",
-	"another action is in progress",
-	"not enough mana",
-	"not enough focus",
+local errorList = DATABASE_DEFAULTS.profile.filters
+
+--------------------------------------------------------------------------------------------------------
+--                                   ErrorFilter options panel                                        --
+--------------------------------------------------------------------------------------------------------
+ErrorFilter.options = {
+	type = "group",
+	name = "ErrorFilter",
+	args = {
+		general = {
+			order = 1,
+			type = "group",
+			name = L["General Settings"],
+			cmdInline = true,
+			args = {
+				unregister = {
+					order = 1,
+					type = "select",
+					style = "dropdown",
+					width = "double",
+					name = L["Operation mode:"],
+					desc = L["Choose how do you want ErrorFilter to work."],
+					get = function()
+						return profileDB.mode
+					end,
+					set = function(key, value)
+						profileDB.mode = value
+						ErrorFilter:UpdateEvents()
+					end,
+					values = function()
+						return {
+							[0] = L["Do nothing"],
+							[1] = L["Filter messages (according to Filters submenu)"],
+							[2] = L["Filter all errors (filter all error messages)"],
+							[3] = L["Remove UIErrorFrame altogether"],
+						}
+					end,
+				},
+			},
+		},
+		filters = {
+			order = 1,
+			type = "group",
+			name = L["Filtered errors"],
+			args = {
+			},
+		},
+	},
 }
 
+local i = 0
+for k, v in pairs(errorList) do
+	i = i + 1
+	ErrorFilter.options.args.filters.args[string.format("error"..i)] = {
+		order = i,
+		width = "full",
+		type = "toggle",
+		name = k,
+		get = function()
+			return profileDB.filters[k]
+		end,
+		set = function(key, value)
+			profileDB.filters[k] = value
+		end,
+	}
+end
+
+function ErrorFilter:SetupOptions()
+	ErrorFilter.options.args.profile = AceDBOptions:GetOptionsTable(self.db)
+	ErrorFilter.options.args.profile.order = -2
+
+	AceConfig:RegisterOptionsTable("ErrorFilter", ErrorFilter.options, nil)
+	
+	self.optionsFrames = {}
+	self.optionsFrames.general = AceConfigDialog:AddToBlizOptions("ErrorFilter", nil, nil, "general")
+	self.optionsFrames.filters = AceConfigDialog:AddToBlizOptions("ErrorFilter", L["Filters"], "ErrorFilter", "filters")
+	self.optionsFrames.profile = AceConfigDialog:AddToBlizOptions("ErrorFilter", L["Profiles"], "ErrorFilter", "profile")
+end
+
 --------------------------------------------------------------------------------------------------------
---                                          ErrorFilter Init                                          --
+--                                            ErrorFilter Init                                        --
 --------------------------------------------------------------------------------------------------------
--- Initializing
-EFframe = CreateFrame("Frame", "EFframe")
-EFframe:SetScript("OnEvent", function(self, event, ...)
-	if self[event] then
-		return self[event](self, event, ...)
+function ErrorFilter:OnInitialize()
+	self.db = AceDB:New("ErrorFilterDB", DATABASE_DEFAULTS, true)
+	if not self.db then
+		Print("Error: Database not loaded correctly. Please exit out of WoW and delete ErrorFilter.lua found in: \\World of Warcraft\\WTF\\Account\\<Account Name>>\\SavedVariables\\")
 	end
-end)
-
--- Replace original error handler
-local original_OnEvent = UIErrorsFrame:GetScript('OnEvent')
-UIErrorsFrame:SetScript('OnEvent', function(self, event, ...)
-	if self[event] then
-		return self[event](self, event, ...)
-	else
-		return original_OnEvent(self, event, ...)
-	end
-end)
-
--- Register Load event
-EFframe:RegisterEvent("ADDON_LOADED")
-
-function EFframe:ADDON_LOADED(event, name)
-	if (name ~= "ErrorFilter") then return end
-	self:UnregisterEvent("ADDON_LOADED")
+	
+	self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
+	self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
+	self.db.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")
+	
+	profileDB = self.db.profile
+	self:SetupOptions()
 	
 	-- Create slash commands
 	SLASH_ErrorFilter1 = "/erf"
 	SLASH_ErrorFilter2 = "/errorfilter"
-	SlashCmdList[name] = EF_interact
+	SlashCmdList["ErrorFilter"] = ErrorFilter.ShowConfig
 	
-	-- Load variables
-	DB_Options = DB_Options or {}
-	DB_Filters = DB_Filters or {}
-	for k, v in pairs(ErrorFilter_Options) do
-		if DB_Options[k] == nil then
-			DB_Options[k] = v
-		end
-	end
-	if (not DB_Filters[1]) then
-		for k, v in pairs(ErrorFilter_Filters) do
-			DB_Filters[k] = v
-		end
-	end
-	
-	-- Show / hide the errorframe
-	if (DB_Options.isShown == true) then
-		UIErrorsFrame:Show()
-	else
-		UIErrorsFrame:Hide()
-	end
+	-- Register events
+	self:RegisterEvent("UI_ERROR_MESSAGE","OnErrorMessage", self)
+	self:UpdateEvents()
+end
 
-	--print(DB_Options.isEnabled,DB_Options.isShown)
+--------------------------------------------------------------------------------------------------------
+--                                       ErrorFilter event handlers                                   --
+--------------------------------------------------------------------------------------------------------
+function ErrorFilter:OnErrorMessage(self, event, msg)
+	if profileDB.mode == 0 then
+		UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+	elseif profileDB.mode == 1 then
+		if not profileDB.filters[msg] then
+			UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+		end
+	end
 end
 
 --------------------------------------------------------------------------------------------------------
 --                                        ErrorFilter functions                                       --
 --------------------------------------------------------------------------------------------------------
--- Error handler
-function UIErrorsFrame:UI_ERROR_MESSAGE(event, name, ...)
-	if (DB_Options.isEnabled and DB_Options.isShown and DB_Filters[1]) then
-		for k, v in next, DB_Filters do
-			if( string.find( string.lower(name), v ) ) then
-				return
-			end
-		end
-	end
-	return original_OnEvent(self, event, name, ...)
+-- Called after profile changed
+function ErrorFilter:OnProfileChanged(event, database, newProfileKey)
+	profileDB = database.profile
 end
 
-
--- Print help
-function EF_PrintHelp()
-	DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ErrorFilter commands:|r")
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00  show / hide|r: Used to enable or disable the blizzard UIErrorFrame.")
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00  enable / disable|r: Used to enable or disable message filtering by ErrorFilter.")
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00  reset|r: Resets to default.")
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00  clear|r: Clears all filters (note that if no filter is present when the game starts, the defaults will be used).")
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00  list|r: Shows a list of all the filters currently used.")
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00  add filter|r: Adds a new filter (ex: |cff00ff00 /erf add there is nothing to attack|r)")
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00  del number|r: Removes a filter from the database. (do |cff00ff00 /erf list|r first and replace number with the index of the message you want to delete)")
+-- Open config window
+function ErrorFilter:ShowConfig()
+	InterfaceOptionsFrame_OpenToCategory(ErrorFilter.optionsFrames.profile)
+	InterfaceOptionsFrame_OpenToCategory(ErrorFilter.optionsFrames.general)
 end
 
-
--- Slash commands handler
-function EF_interact(input)
-	if (input) then
-		input = string.lower(input)
-		local a, b = string.find(input," ")
-		if (input == "help") then
-			EF_PrintHelp()
-		elseif input  == "status" then
-			print("Filter enabled:", DB_Options.isEnabled)
-			print("Frame enabled:", DB_Options.isShown)
-		elseif (input == "enable" or input == "disable") then
-			if (DB_Options.isEnabled == false) then
-				DB_Options.isEnabled = true
-				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ErrorFilter enabled.|r")
-			else
-				DB_Options.isEnabled = false
-				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ErrorFilter disabled.|r")
-			end
-		elseif (input == "hide" or input == "show") then
-			if (DB_Options.isShown == true) then
-				DB_Options.isShown = false
-				UIErrorsFrame:Hide()
-				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ErrorFilter hides error frame.|r")
-			else
-				DB_Options.isShown = true
-				UIErrorsFrame:Show()
-				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ErrorFilter shows error frame.|r")
-			end
-		elseif (input == "reset") then
-			DB_Filters = {}
-			for k, v in pairs(ErrorFilter_Filters) do
-				DB_Filters[k] = v
-			end
-			for k, v in pairs(ErrorFilter_Options) do
-				DB_Options[k] = v
-			end
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ErrorFilter database resetted.|r")
-		elseif (input == "clear") then
-			DB_Filters = {}
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ErrorFilter database cleared.|r")
-		elseif (input == "list") then
-			if ( DB_Filters[1] ) then
-				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ErrorFilter Database:|r")
-				local i = 0;
-				for k, v in pairs(DB_Filters) do
-					i = i+1
-					if i > 9 then
-						DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00 "..i..". \"|r"..DB_Filters[k].."|cff00ff00\"|r")
-					else
-						DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00  "..i..". \"|r"..DB_Filters[k].."|cff00ff00\"|r")
-					end
-				end
-			else
-				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ErrorFilter database is empty.|r")
-			end
-		elseif a then
-			first = string.sub(input,1,a-1)
-			second = string.sub(input,a+1)
-			if (first == "add") then
-				tinsert(DB_Filters, second)
-				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ErrorFilter added filter \"|r"..second.."|cff00ff00\"|r")
-			elseif (first == "del") then
-				local n = tonumber(second)
-				if (n and 0<n and n<=#DB_Filters) then
-					second = DB_Filters[n]
-					tremove(DB_Filters, n)
-					DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ErrorFilter removed filter \"|r"..second.."|cff00ff00\"|r")
-				else
-					DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ErrorFilter wrong filter number.|r")
-				end
-			else
-				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ErrorFilter unknown command. Try|r |cff00ff00 /erf help|r")
-			end
-		else
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ErrorFilter unknown command. Try|r |cff00ff00 /erf help|r")
+-- Check options and set events
+function ErrorFilter:UpdateEvents()
+	if profileDB.mode == 3 then
+		UIErrorsFrame:Hide()
+	else
+		UIErrorsFrame:Show()
+		if profileDB.mode == 2 or profileDB.mode == 1 then
+			UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
 		end
 	end
 end

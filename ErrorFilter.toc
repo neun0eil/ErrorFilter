@@ -1,9 +1,24 @@
 ## Interface: 40000
 ## Title: ErrorFilter
 ## Notes: Filters the errors dislayed in the UIErrorsFrame.
-## Version: 1.7
+## Version: 2.0
 ## Author: iceeagle
-## SavedVariables: DB_Options, DB_Filters
+## OptionalDeps: Ace3
+## SavedVariables: ErrorFilterDB
 ## DefaultState: enabled
+
+#@no-lib-strip@
+embeds.xml
+#@end-no-lib-strip@
+
+Locales\enUS.lua
+Locales\deDE.lua
+Locales\frFR.lua
+Locales\esES.lua
+Locales\esMX.lua
+Locales\koKR.lua
+Locales\ruRU.lua
+Locales\zhTW.lua
+Locales\zhCN.lua
 
 ErrorFilter.lua
