@@ -28,8 +28,6 @@ local DATABASE_DEFAULTS = {
 			[ERR_AUTOFOLLOW_TOO_FAR] = false,
 			[ERR_BADATTACKFACING] = false,
 			[ERR_BADATTACKPOS] = true,
-			[ERR_BATTLEGROUND_INFO_THROTTLED] = true,
-			[ERR_CANTATTACK_NOTSTANDING] = false,
 			[ERR_CLIENT_LOCKED_OUT] = false,
 			[ERR_GENERIC_NO_TARGET] = true,
 			[ERR_GENERIC_NO_VALID_TARGETS] = true,
@@ -59,7 +57,6 @@ local DATABASE_DEFAULTS = {
 			[SPELL_FAILED_CASTER_AURASTATE] = true,
 			[SPELL_FAILED_NO_COMBO_POINTS] = true,
 			[SPELL_FAILED_SPELL_IN_PROGRESS] = true,
-			[SPELL_FAILED_TARGETS_DEAD] = false,
 			[SPELL_FAILED_TARGET_AURASTATE] = true,
 		},
 	},
@@ -84,7 +81,6 @@ ErrorFilter.options = {
 					order = 1,
 					type = "select",
 					style = "dropdown",
-					width = "double",
 					name = L["Operation mode:"],
 					desc = L["Choose how do you want ErrorFilter to work."],
 					get = function()
@@ -97,10 +93,43 @@ ErrorFilter.options = {
 					values = function()
 						return {
 							[0] = L["Do nothing"],
-							[1] = L["Filter messages (according to Filters submenu)"],
-							[2] = L["Filter all errors (filter all error messages)"],
-							[3] = L["Remove UIErrorFrame altogether"],
+							[1] = L["Custom filter"],
+							[2] = L["Filter all errors"],
+							[3] = L["Remove UIErrorFrame"],
 						}
+					end,
+				},
+				separator = {
+					order = 2,
+					type = "description",
+					name = "",
+				},
+				warning1 = {
+					order = 3,
+					type = "execute",
+					name = L["Set filters"],
+					desc = L["Open the menu to set custom filters."],
+					func = function()
+						InterfaceOptionsFrame_OpenToCategory(ErrorFilter.optionsFrames.filters)
+					end,
+					hidden = function()
+						return not (profileDB.mode == 1)
+					end,
+				},
+				warning2 = {
+					order = 3,
+					type = "description",
+					name = "|cFFFF0202"..L["Warning! This will prevent all error messages from appearing in the UI Error Frame."].."|r",
+					hidden = function()
+						return not (profileDB.mode == 2)
+					end,
+				},
+				warning3 = {
+					order = 3,
+					type = "description",
+					name = "|cFFFF0202"..L["Warning! This will prevent any message from appearing in the UI Error Frame, including quest updates text."].."|r",
+					hidden = function()
+						return not (profileDB.mode == 3)
 					end,
 				},
 			},
@@ -110,6 +139,12 @@ ErrorFilter.options = {
 			type = "group",
 			name = L["Filtered errors"],
 			args = {
+				info = {
+					order = 0,
+					type = "description",
+					name = "|cFF02FF02"..L["Choose the errors you do not want to see:"].."|r",
+					fontSize = "large",
+				},
 			},
 		},
 	},
@@ -123,6 +158,7 @@ for k, v in pairs(errorList) do
 		width = "full",
 		type = "toggle",
 		name = k,
+		desc = L["Toggle to filter this error."],
 		get = function()
 			return profileDB.filters[k]
 		end,
@@ -135,7 +171,7 @@ end
 function ErrorFilter:SetupOptions()
 	ErrorFilter.options.args.profile = AceDBOptions:GetOptionsTable(self.db)
 	ErrorFilter.options.args.profile.order = -2
-
+	
 	AceConfig:RegisterOptionsTable("ErrorFilter", ErrorFilter.options, nil)
 	
 	self.optionsFrames = {}
@@ -166,7 +202,6 @@ function ErrorFilter:OnInitialize()
 	SlashCmdList["ErrorFilter"] = ErrorFilter.ShowConfig
 	
 	-- Register events
-	self:RegisterEvent("UI_ERROR_MESSAGE","OnErrorMessage", self)
 	self:UpdateEvents()
 end
 
@@ -174,12 +209,8 @@ end
 --                                       ErrorFilter event handlers                                   --
 --------------------------------------------------------------------------------------------------------
 function ErrorFilter:OnErrorMessage(self, event, msg)
-	if profileDB.mode == 0 then
+	if not profileDB.filters[msg] then
 		UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
-	elseif profileDB.mode == 1 then
-		if not profileDB.filters[msg] then
-			UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
-		end
 	end
 end
 
@@ -201,10 +232,18 @@ end
 function ErrorFilter:UpdateEvents()
 	if profileDB.mode == 3 then
 		UIErrorsFrame:Hide()
+		self:UnregisterEvent("UI_ERROR_MESSAGE")
 	else
 		UIErrorsFrame:Show()
-		if profileDB.mode == 2 or profileDB.mode == 1 then
+		if profileDB.mode == 2 then
 			UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
+			self:UnregisterEvent("UI_ERROR_MESSAGE")
+		elseif profileDB.mode == 1 then
+			UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
+			self:RegisterEvent("UI_ERROR_MESSAGE","OnErrorMessage", self)
+		elseif profileDB.mode == 0 then
+			UIErrorsFrame:RegisterEvent("UI_ERROR_MESSAGE")
+			self:UnregisterEvent("UI_ERROR_MESSAGE")
 		end
 	end
 end
