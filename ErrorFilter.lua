@@ -61,6 +61,12 @@ local DATABASE_DEFAULTS = {
 		},
 	},
 }
+-- sort by key
+local a = {}
+local order = {}
+for n in pairs(DATABASE_DEFAULTS.profile.filters) do table.insert(a, n) end
+table.sort(a)
+for i,n in ipairs(a) do order[n] = i end
 
 local errorList = DATABASE_DEFAULTS.profile.filters
 
@@ -150,11 +156,9 @@ ErrorFilter.options = {
 	},
 }
 
-local i = 0
 for k, v in pairs(errorList) do
-	i = i + 1
-	ErrorFilter.options.args.filters.args[string.format("error"..i)] = {
-		order = i,
+	ErrorFilter.options.args.filters.args[string.format("error"..order[k])] = {
+		order = order[k],
 		width = "full",
 		type = "toggle",
 		name = k,
