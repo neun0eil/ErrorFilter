@@ -16,6 +16,7 @@ local DATABASE_DEFAULTS = {
 	profile = {
 		mode = 1,
 		filters = {
+			[INTERRUPTED] = false,
 			[ERR_ABILITY_COOLDOWN] = true,
 			[ERR_ATTACK_CHANNEL] = false,
 			[ERR_ATTACK_CHARMED] = false,
@@ -27,7 +28,7 @@ local DATABASE_DEFAULTS = {
 			[ERR_ATTACK_STUNNED] = false,
 			[ERR_AUTOFOLLOW_TOO_FAR] = false,
 			[ERR_BADATTACKFACING] = false,
-			[ERR_BADATTACKPOS] = true,
+			[ERR_BADATTACKPOS] = false,
 			[ERR_CLIENT_LOCKED_OUT] = false,
 			[ERR_GENERIC_NO_TARGET] = true,
 			[ERR_GENERIC_NO_VALID_TARGETS] = true,
@@ -52,25 +53,47 @@ local DATABASE_DEFAULTS = {
 			[ERR_TOO_FAR_TO_INTERACT] = false,
 			[ERR_USE_BAD_ANGLE] = false,
 			[ERR_USE_CANT_IMMUNE] = false,
+			[ERR_USE_TOO_FAR] = false,
 			[SPELL_FAILED_BAD_IMPLICIT_TARGETS] = true,
 			[SPELL_FAILED_BAD_TARGETS] = true,
 			[SPELL_FAILED_CASTER_AURASTATE] = true,
-			[SPELL_FAILED_NOTHING_TO_DISPEL] = false,
 			[SPELL_FAILED_NO_COMBO_POINTS] = true,
 			[SPELL_FAILED_SPELL_IN_PROGRESS] = true,
 			[SPELL_FAILED_TARGET_AURASTATE] = true,
-			[SPELL_FAILED_TOO_CLOSE] = false,
 		},
+		allows = {
+			[INTERRUPTED] = true,
+			[ERR_BADATTACKFACING] = true,
+			[ERR_BADATTACKPOS] = true,
+			[ERR_NOT_IN_COMBAT] = true,
+			[ERR_OUT_OF_RANGE] = true,
+			[ERR_SPELL_OUT_OF_RANGE] = true,
+			[ERR_TOO_FAR_TO_INTERACT] = true,
+			[ERR_USE_BAD_ANGLE] = true,
+			[ERR_USE_TOO_FAR] = true,
+		},
+		custom_filters = {"missing reagent:",},
+		custom_allows = {},
 	},
 }
 -- sort by key
 local a = {}
-local order = {}
+local filters_order = {}
 for n in pairs(DATABASE_DEFAULTS.profile.filters) do table.insert(a, n) end
 table.sort(a)
-for i,n in ipairs(a) do order[n] = i end
+for i, n in ipairs(a) do filters_order[n] = i end
 
-local errorList = DATABASE_DEFAULTS.profile.filters
+a = {}
+local allows_order = {}
+for n in pairs(DATABASE_DEFAULTS.profile.allows) do table.insert(a, n) end
+table.sort(a)
+for i, n in ipairs(a) do allows_order[n] = i end
+
+local DO_NOTHING = 0
+local FILTER_ONLY = 1
+local ALLOW_ONLY = 2
+local FILTER_ALL = 3
+local REMOVE_FRAME = 4
 
 --------------------------------------------------------------------------------------------------------
 --                                   ErrorFilter options panel                                        --
@@ -100,10 +123,11 @@ ErrorFilter.options = {
 					end,
 					values = function()
 						return {
-							[0] = L["Do nothing"],
-							[1] = L["Custom filter"],
-							[2] = L["Filter all errors"],
-							[3] = L["Remove UIErrorFrame"],
+							[DO_NOTHING] = L["Do nothing"],
+							[FILTER_ONLY] = L["Filter only ..."],
+							[ALLOW_ONLY] = L["Allow only ..."],
+							[FILTER_ALL] = L["Filter all errors"],
+							[REMOVE_FRAME] = L["Remove UIErrorFrame"],
 						}
 					end,
 				},
@@ -121,23 +145,35 @@ ErrorFilter.options = {
 						InterfaceOptionsFrame_OpenToCategory(ErrorFilter.optionsFrames.filters)
 					end,
 					hidden = function()
-						return not (profileDB.mode == 1)
+						return not (profileDB.mode == FILTER_ONLY)
 					end,
 				},
 				warning2 = {
 					order = 3,
-					type = "description",
-					name = "|cFFFF0202"..L["Warning! This will prevent all error messages from appearing in the UI Error Frame."].."|r",
+					type = "execute",
+					name = L["Set filters"],
+					desc = L["Open the menu to set custom filters."],
+					func = function()
+						InterfaceOptionsFrame_OpenToCategory(ErrorFilter.optionsFrames.allows)
+					end,
 					hidden = function()
-						return not (profileDB.mode == 2)
+						return not (profileDB.mode == ALLOW_ONLY)
 					end,
 				},
 				warning3 = {
 					order = 3,
 					type = "description",
+					name = "|cFFFF0202"..L["Warning! This will prevent all error messages from appearing in the UI Error Frame."].."|r",
+					hidden = function()
+						return not (profileDB.mode == FILTER_ALL)
+					end,
+				},
+				warning4 = {
+					order = 3,
+					type = "description",
 					name = "|cFFFF0202"..L["Warning! This will prevent any message from appearing in the UI Error Frame, including quest updates text."].."|r",
 					hidden = function()
-						return not (profileDB.mode == 3)
+						return not (profileDB.mode == REMOVE_FRAME)
 					end,
 				},
 			},
@@ -147,20 +183,114 @@ ErrorFilter.options = {
 			type = "group",
 			name = L["Filtered errors"],
 			args = {
-				info = {
-					order = 0,
+				separator1 = {
+					order = 1,
+					type = "header",
+					name = "|cFF02FF02"..L["Manage custom filters:"].."|r",
+				},
+				new = {
+					order = 2,
+					type = "input",
+					width = "full",
+					name = L["New"],
+					desc = L["Add a new string."],
+					get = false,
+					set = function(key, value)
+						tinsert(profileDB.custom_filters, string.lower(value))
+					end,
+					disabled = function()
+						return not (profileDB.mode == FILTER_ONLY)
+					end,
+				},
+				delete = {
+					order = 3,
+					type = "select",
+					width = "full",
+					name = L["Delete"],
+					desc = L["Delete a string from the list"],
+					get = false,
+					set = function(key, value)
+						tremove(profileDB.custom_filters, value)
+					end,
+					values = function()
+						return profileDB.custom_filters
+					end,
+					disabled = function()
+						return not ((#profileDB.custom_filters > 0) and (profileDB.mode == FILTER_ONLY))
+					end,
+				},
+				separator2 = {
+					order = 9,
 					type = "description",
+					name = "\n",
+				},
+				separator3 = {
+					order = 10,
+					type = "header",
 					name = "|cFF02FF02"..L["Choose the errors you do not want to see:"].."|r",
-					fontSize = "large",
+				},
+			},
+		},
+		allows = {
+			order = 1,
+			type = "group",
+			name = L["Allowed errors"],
+			args = {
+				separator1 = {
+					order = 1,
+					type = "header",
+					name = "|cFF02FF02"..L["Manage custom allows:"].."|r",
+				},
+				new = {
+					order = 2,
+					type = "input",
+					width = "full",
+					name = L["New"],
+					desc = L["Add a new string."],
+					get = false,
+					set = function(key, value)
+						tinsert(profileDB.custom_allows, string.lower(value))
+					end,
+					disabled = function()
+						return not (profileDB.mode == ALLOW_ONLY)
+					end,
+				},
+				delete = {
+					order = 3,
+					type = "select",
+					width = "full",
+					name = L["Delete"],
+					desc = L["Delete a string from the list"],
+					get = false,
+					set = function(key, value)
+						tremove(profileDB.custom_allows, value)
+					end,
+					values = function()
+						return profileDB.custom_allows
+					end,
+					disabled = function()
+						return not ((#profileDB.custom_allows > 0) and (profileDB.mode == ALLOW_ONLY))
+					end,
+				},
+				separator2 = {
+					order = 9,
+					type = "description",
+					name = "\n",
+				},
+				separator3 = {
+					order = 10,
+					type = "header",
+					name = "|cFF02FF02"..L["Choose the errors you want to see:"].."|r",
 				},
 			},
 		},
 	},
 }
 
-for k, v in pairs(errorList) do
-	ErrorFilter.options.args.filters.args[string.format("error"..order[k])] = {
-		order = order[k],
+-- generate filters submenu
+for k, v in pairs(DATABASE_DEFAULTS.profile.filters) do
+	ErrorFilter.options.args.filters.args[string.format("error"..filters_order[k])] = {
+		order = 10 + filters_order[k],
 		width = "full",
 		type = "toggle",
 		name = k,
@@ -170,6 +300,29 @@ for k, v in pairs(errorList) do
 		end,
 		set = function(key, value)
 			profileDB.filters[k] = value
+		end,
+		disabled = function()
+			return not (profileDB.mode == FILTER_ONLY)
+		end,
+	}
+end
+
+-- generate allows submenu
+for k, v in pairs(DATABASE_DEFAULTS.profile.allows) do
+	ErrorFilter.options.args.allows.args[string.format("allow"..allows_order[k])] = {
+		order = 10 + allows_order[k],
+		width = "full",
+		type = "toggle",
+		name = k,
+		desc = L["Toggle to allow this error."],
+		get = function()
+			return profileDB.allows[k]
+		end,
+		set = function(key, value)
+			profileDB.allows[k] = value
+		end,
+		disabled = function()
+			return not (profileDB.mode == ALLOW_ONLY)
 		end,
 	}
 end
@@ -182,7 +335,8 @@ function ErrorFilter:SetupOptions()
 	
 	self.optionsFrames = {}
 	self.optionsFrames.general = AceConfigDialog:AddToBlizOptions("ErrorFilter", nil, nil, "general")
-	self.optionsFrames.filters = AceConfigDialog:AddToBlizOptions("ErrorFilter", L["Filters"], "ErrorFilter", "filters")
+	self.optionsFrames.filters = AceConfigDialog:AddToBlizOptions("ErrorFilter", L["Filter only ..."], "ErrorFilter", "filters")
+	self.optionsFrames.allows = AceConfigDialog:AddToBlizOptions("ErrorFilter", L["Allow only ..."], "ErrorFilter", "allows")
 	self.optionsFrames.profile = AceConfigDialog:AddToBlizOptions("ErrorFilter", L["Profiles"], "ErrorFilter", "profile")
 end
 
@@ -215,8 +369,31 @@ end
 --                                       ErrorFilter event handlers                                   --
 --------------------------------------------------------------------------------------------------------
 function ErrorFilter:OnErrorMessage(self, event, msg)
-	if not profileDB.filters[msg] then
+	if profileDB.mode == FILTER_ONLY then
+		-- check default filters
+		if profileDB.filters[msg] then
+			return
+		end
+		-- check custom filters
+		for k, v in next, profileDB.custom_filters do
+			if string.find(string.lower(msg), v) then
+				return
+			end
+		end
 		UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+	elseif profileDB.mode == ALLOW_ONLY then
+		-- check default allows
+		if profileDB.allows[msg] then
+			UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+			return
+		end
+		-- check custom allows
+		for k, v in next, profileDB.custom_allows do
+			if string.find(string.lower(msg), v) then
+				UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+				return
+			end
+		end
 	end
 end
 
@@ -236,18 +413,18 @@ end
 
 -- Check options and set events
 function ErrorFilter:UpdateEvents()
-	if profileDB.mode == 3 then
+	if profileDB.mode == REMOVE_FRAME then
 		UIErrorsFrame:Hide()
 		self:UnregisterEvent("UI_ERROR_MESSAGE")
 	else
 		UIErrorsFrame:Show()
-		if profileDB.mode == 2 then
+		if profileDB.mode == FILTER_ALL then
 			UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
 			self:UnregisterEvent("UI_ERROR_MESSAGE")
-		elseif profileDB.mode == 1 then
+		elseif profileDB.mode == FILTER_ONLY or profileDB.mode == ALLOW_ONLY then
 			UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
 			self:RegisterEvent("UI_ERROR_MESSAGE","OnErrorMessage", self)
-		elseif profileDB.mode == 0 then
+		elseif profileDB.mode == DO_NOTHING then
 			UIErrorsFrame:RegisterEvent("UI_ERROR_MESSAGE")
 			self:UnregisterEvent("UI_ERROR_MESSAGE")
 		end
