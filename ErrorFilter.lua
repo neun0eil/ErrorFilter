@@ -72,7 +72,7 @@ local DATABASE_DEFAULTS = {
 			[ERR_USE_BAD_ANGLE] = true,
 			[ERR_USE_TOO_FAR] = true,
 		},
-		custom_filters = {"missing reagent:",},
+		custom_filters = {},
 		custom_allows = {},
 	},
 }
