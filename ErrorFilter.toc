@@ -1,7 +1,7 @@
-## Interface: 40200
+﻿## Interface: 40200
 ## Title: ErrorFilter
 ## Notes: Filters the errors dislayed in the UIErrorsFrame.
-## Version: 2.2
+## Version: 2.3
 ## Author: iceeagle
 ## OptionalDeps: Ace3
 ## SavedVariables: ErrorFilterDB
@@ -20,6 +20,7 @@ Locales\frFR.lua
 Locales\esES.lua
 Locales\esMX.lua
 Locales\koKR.lua
+Locales\ptBR.lua
 Locales\ruRU.lua
 Locales\zhTW.lua
 Locales\zhCN.lua

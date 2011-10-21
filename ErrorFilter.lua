@@ -1,4 +1,4 @@
---------------------------------------------------------------------------------------------------------
+﻿--------------------------------------------------------------------------------------------------------
 --                                         AceAddon init                                              --
 --------------------------------------------------------------------------------------------------------
 ErrorFilter = LibStub("AceAddon-3.0"):NewAddon("ErrorFilter", "AceEvent-3.0")
@@ -330,9 +330,9 @@ end
 function ErrorFilter:SetupOptions()
 	ErrorFilter.options.args.profile = AceDBOptions:GetOptionsTable(self.db)
 	ErrorFilter.options.args.profile.order = -2
-	
+
 	AceConfig:RegisterOptionsTable("ErrorFilter", ErrorFilter.options, nil)
-	
+
 	self.optionsFrames = {}
 	self.optionsFrames.general = AceConfigDialog:AddToBlizOptions("ErrorFilter", nil, nil, "general")
 	self.optionsFrames.filters = AceConfigDialog:AddToBlizOptions("ErrorFilter", L["Filter only ..."], "ErrorFilter", "filters")
@@ -348,19 +348,19 @@ function ErrorFilter:OnInitialize()
 	if not self.db then
 		Print("Error: Database not loaded correctly. Please exit out of WoW and delete ErrorFilter.lua found in: \\World of Warcraft\\WTF\\Account\\<Account Name>>\\SavedVariables\\")
 	end
-	
+
 	self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
 	self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
 	self.db.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")
-	
+
 	profileDB = self.db.profile
 	self:SetupOptions()
-	
+
 	-- Create slash commands
 	SLASH_ErrorFilter1 = "/erf"
 	SLASH_ErrorFilter2 = "/errorfilter"
 	SlashCmdList["ErrorFilter"] = ErrorFilter.ShowConfig
-	
+
 	-- Register events
 	self:UpdateEvents()
 end
