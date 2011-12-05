@@ -1,8 +1,16 @@
 ﻿--------------------------------------------------------------------------------------------------------
+--                                             Localized global                                       --
+--------------------------------------------------------------------------------------------------------
+local _G = getfenv(0)
+
+--------------------------------------------------------------------------------------------------------
 --                                         AceAddon init                                              --
 --------------------------------------------------------------------------------------------------------
-ErrorFilter = LibStub("AceAddon-3.0"):NewAddon("ErrorFilter", "AceEvent-3.0")
-local L = LibStub("AceLocale-3.0"):GetLocale("ErrorFilter")
+local MODNAME = "ErrorFilter"
+local addon = LibStub("AceAddon-3.0"):NewAddon(MODNAME, "AceEvent-3.0")
+_G.ErrorFilter = addon
+
+local L = LibStub("AceLocale-3.0"):GetLocale(MODNAME)
 local AceConfig = LibStub("AceConfig-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
 local AceDB = LibStub("AceDB-3.0")
@@ -15,6 +23,7 @@ local profileDB
 local DATABASE_DEFAULTS = {
 	profile = {
 		mode = 1,
+		updateOnlyInCombat = false,
 		filters = {
 			[INTERRUPTED] = false,
 			[ERR_ABILITY_COOLDOWN] = true,
@@ -95,12 +104,16 @@ local ALLOW_ONLY = 2
 local FILTER_ALL = 3
 local REMOVE_FRAME = 4
 
+local IN_COMBAT = 0
+local OUT_OF_COMBAT = 1
+local state = OUT_OF_COMBAT
+
 --------------------------------------------------------------------------------------------------------
 --                                   ErrorFilter options panel                                        --
 --------------------------------------------------------------------------------------------------------
-ErrorFilter.options = {
+addon.options = {
 	type = "group",
-	name = "ErrorFilter",
+	name = MODNAME,
 	args = {
 		general = {
 			order = 1,
@@ -119,7 +132,7 @@ ErrorFilter.options = {
 					end,
 					set = function(key, value)
 						profileDB.mode = value
-						ErrorFilter:UpdateEvents()
+						addon:UpdateEvents()
 					end,
 					values = function()
 						return {
@@ -131,37 +144,52 @@ ErrorFilter.options = {
 						}
 					end,
 				},
-				separator = {
+				combat = {
 					order = 2,
+					type = "toggle",
+					name = L["Filter only in combat."],
+					desc = L["Toggle to stop filtering while out of combat."],
+					get = function()
+						return profileDB.updateOnlyInCombat
+					end,
+					set = function(key, value)
+						profileDB.updateOnlyInCombat = value
+					end,
+					disabled = function()
+						return (profileDB.mode == DO_NOTHING) or (profileDB.mode == REMOVE_FRAME)
+					end,
+				},
+				separator = {
+					order = 3,
 					type = "description",
 					name = "",
 				},
 				warning1 = {
-					order = 3,
+					order = 10,
 					type = "execute",
 					name = L["Set filters"],
 					desc = L["Open the menu to set custom filters."],
 					func = function()
-						InterfaceOptionsFrame_OpenToCategory(ErrorFilter.optionsFrames.filters)
+						InterfaceOptionsFrame_OpenToCategory(addon.optionsFrames.filters)
 					end,
 					hidden = function()
 						return not (profileDB.mode == FILTER_ONLY)
 					end,
 				},
 				warning2 = {
-					order = 3,
+					order = 11,
 					type = "execute",
 					name = L["Set filters"],
 					desc = L["Open the menu to set custom filters."],
 					func = function()
-						InterfaceOptionsFrame_OpenToCategory(ErrorFilter.optionsFrames.allows)
+						InterfaceOptionsFrame_OpenToCategory(addon.optionsFrames.allows)
 					end,
 					hidden = function()
 						return not (profileDB.mode == ALLOW_ONLY)
 					end,
 				},
 				warning3 = {
-					order = 3,
+					order = 12,
 					type = "description",
 					name = "|cFFFF0202"..L["Warning! This will prevent all error messages from appearing in the UI Error Frame."].."|r",
 					hidden = function()
@@ -169,7 +197,7 @@ ErrorFilter.options = {
 					end,
 				},
 				warning4 = {
-					order = 3,
+					order = 13,
 					type = "description",
 					name = "|cFFFF0202"..L["Warning! This will prevent any message from appearing in the UI Error Frame, including quest updates text."].."|r",
 					hidden = function()
@@ -289,7 +317,7 @@ ErrorFilter.options = {
 
 -- generate filters submenu
 for k, v in pairs(DATABASE_DEFAULTS.profile.filters) do
-	ErrorFilter.options.args.filters.args[string.format("error"..filters_order[k])] = {
+	addon.options.args.filters.args[string.format("error"..filters_order[k])] = {
 		order = 10 + filters_order[k],
 		width = "full",
 		type = "toggle",
@@ -309,7 +337,7 @@ end
 
 -- generate allows submenu
 for k, v in pairs(DATABASE_DEFAULTS.profile.allows) do
-	ErrorFilter.options.args.allows.args[string.format("allow"..allows_order[k])] = {
+	addon.options.args.allows.args[string.format("allow"..allows_order[k])] = {
 		order = 10 + allows_order[k],
 		width = "full",
 		type = "toggle",
@@ -327,23 +355,23 @@ for k, v in pairs(DATABASE_DEFAULTS.profile.allows) do
 	}
 end
 
-function ErrorFilter:SetupOptions()
-	ErrorFilter.options.args.profile = AceDBOptions:GetOptionsTable(self.db)
-	ErrorFilter.options.args.profile.order = -2
+function addon:SetupOptions()
+	addon.options.args.profile = AceDBOptions:GetOptionsTable(self.db)
+	addon.options.args.profile.order = -2
 
-	AceConfig:RegisterOptionsTable("ErrorFilter", ErrorFilter.options, nil)
+	AceConfig:RegisterOptionsTable(MODNAME, addon.options, nil)
 
 	self.optionsFrames = {}
-	self.optionsFrames.general = AceConfigDialog:AddToBlizOptions("ErrorFilter", nil, nil, "general")
-	self.optionsFrames.filters = AceConfigDialog:AddToBlizOptions("ErrorFilter", L["Filter only ..."], "ErrorFilter", "filters")
-	self.optionsFrames.allows = AceConfigDialog:AddToBlizOptions("ErrorFilter", L["Allow only ..."], "ErrorFilter", "allows")
-	self.optionsFrames.profile = AceConfigDialog:AddToBlizOptions("ErrorFilter", L["Profiles"], "ErrorFilter", "profile")
+	self.optionsFrames.general = AceConfigDialog:AddToBlizOptions(MODNAME, nil, nil, "general")
+	self.optionsFrames.filters = AceConfigDialog:AddToBlizOptions(MODNAME, L["Filter only ..."], MODNAME, "filters")
+	self.optionsFrames.allows = AceConfigDialog:AddToBlizOptions(MODNAME, L["Allow only ..."], MODNAME, "allows")
+	self.optionsFrames.profile = AceConfigDialog:AddToBlizOptions(MODNAME, L["Profiles"], MODNAME, "profile")
 end
 
 --------------------------------------------------------------------------------------------------------
 --                                            ErrorFilter Init                                        --
 --------------------------------------------------------------------------------------------------------
-function ErrorFilter:OnInitialize()
+function addon:OnInitialize()
 	self.db = AceDB:New("ErrorFilterDB", DATABASE_DEFAULTS, true)
 	if not self.db then
 		Print("Error: Database not loaded correctly. Please exit out of WoW and delete ErrorFilter.lua found in: \\World of Warcraft\\WTF\\Account\\<Account Name>>\\SavedVariables\\")
@@ -359,16 +387,23 @@ function ErrorFilter:OnInitialize()
 	-- Create slash commands
 	SLASH_ErrorFilter1 = "/erf"
 	SLASH_ErrorFilter2 = "/errorfilter"
-	SlashCmdList["ErrorFilter"] = ErrorFilter.ShowConfig
+	SlashCmdList["ErrorFilter"] = addon.ShowConfig
 
 	-- Register events
 	self:UpdateEvents()
+	
+	self:RegisterEvent("PLAYER_REGEN_ENABLED","OnRegenEnable")
+	self:RegisterEvent("PLAYER_REGEN_DISABLED","OnRegenDisable")
 end
 
 --------------------------------------------------------------------------------------------------------
 --                                       ErrorFilter event handlers                                   --
 --------------------------------------------------------------------------------------------------------
-function ErrorFilter:OnErrorMessage(self, event, msg)
+function addon:OnErrorMessage(self, event, msg)
+	if (state == OUT_OF_COMBAT) and profileDB.updateOnlyInCombat then
+		UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+		return
+	end
 	if profileDB.mode == FILTER_ONLY then
 		-- check default filters
 		if profileDB.filters[msg] then
@@ -397,29 +432,51 @@ function ErrorFilter:OnErrorMessage(self, event, msg)
 	end
 end
 
+function addon:OnRegenEnable()
+	state = OUT_OF_COMBAT
+	if (profileDB.mode == FILTER_ALL) and profileDB.updateOnlyInCombat then
+		UIErrorsFrame:RegisterEvent("UI_ERROR_MESSAGE")
+	end
+end
+
+function addon:OnRegenDisable()
+	state = IN_COMBAT
+	if (profileDB.mode == FILTER_ALL) and profileDB.updateOnlyInCombat then
+		UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
+	end
+end
+
 --------------------------------------------------------------------------------------------------------
 --                                        ErrorFilter functions                                       --
 --------------------------------------------------------------------------------------------------------
 -- Called after profile changed
-function ErrorFilter:OnProfileChanged(event, database, newProfileKey)
+function addon:OnProfileChanged(event, database, newProfileKey)
 	profileDB = database.profile
 end
 
 -- Open config window
-function ErrorFilter:ShowConfig()
-	InterfaceOptionsFrame_OpenToCategory(ErrorFilter.optionsFrames.profile)
-	InterfaceOptionsFrame_OpenToCategory(ErrorFilter.optionsFrames.general)
+function addon:ShowConfig()
+	InterfaceOptionsFrame_OpenToCategory(addon.optionsFrames.profile)
+	InterfaceOptionsFrame_OpenToCategory(addon.optionsFrames.general)
 end
 
 -- Check options and set events
-function ErrorFilter:UpdateEvents()
+function addon:UpdateEvents()
 	if profileDB.mode == REMOVE_FRAME then
 		UIErrorsFrame:Hide()
 		self:UnregisterEvent("UI_ERROR_MESSAGE")
 	else
 		UIErrorsFrame:Show()
 		if profileDB.mode == FILTER_ALL then
-			UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
+			if profileDB.updateOnlyInCombat then
+				if state == IN_COMBAT then
+					UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
+				else
+					UIErrorsFrame:RegisterEvent("UI_ERROR_MESSAGE")
+				end
+			else
+				UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
+			end
 			self:UnregisterEvent("UI_ERROR_MESSAGE")
 		elseif profileDB.mode == FILTER_ONLY or profileDB.mode == ALLOW_ONLY then
 			UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
