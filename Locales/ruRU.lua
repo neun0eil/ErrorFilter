@@ -1,4 +1,4 @@
-﻿-- Rusian localization
+﻿-- Russian localization
 
 local L = LibStub("AceLocale-3.0"):NewLocale("ErrorFilter", "ruRU")
 if not L then return end

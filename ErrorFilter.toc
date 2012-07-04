@@ -1,7 +1,7 @@
 ﻿## Interface: 40300
 ## Title: ErrorFilter
 ## Notes: Filters the errors dislayed in the UIErrorsFrame.
-## Version: 2.5.0
+## Version: 2.5
 ## Author: iceeagle
 ## OptionalDeps: Ace3
 ## SavedVariables: ErrorFilterDB
@@ -16,13 +16,14 @@ embeds.xml
 
 Locales\enUS.lua
 Locales\deDE.lua
-Locales\frFR.lua
 Locales\esES.lua
 Locales\esMX.lua
+Locales\frFR.lua
+Locales\itIT.lua
 Locales\koKR.lua
 Locales\ptBR.lua
 Locales\ruRU.lua
-Locales\zhTW.lua
 Locales\zhCN.lua
+Locales\zhTW.lua
 
 ErrorFilter.lua
