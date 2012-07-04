@@ -1,7 +1,7 @@
 ﻿## Interface: 40300
 ## Title: ErrorFilter
 ## Notes: Filters the errors dislayed in the UIErrorsFrame.
-## Version: 2.5
+## Version: 2.5.0
 ## Author: iceeagle
 ## OptionalDeps: Ace3
 ## SavedVariables: ErrorFilterDB
