@@ -7,7 +7,7 @@ local _G = getfenv(0)
 --                                         AceAddon init                                              --
 --------------------------------------------------------------------------------------------------------
 local MODNAME = "ErrorFilter"
-local addon = LibStub("AceAddon-3.0"):NewAddon(MODNAME, "AceEvent-3.0")
+local addon = LibStub("AceAddon-3.0"):NewAddon(MODNAME, "AceEvent-3.0", "LibSink-2.0")
 _G.ErrorFilter = addon
 
 local L = LibStub("AceLocale-3.0"):GetLocale(MODNAME)
@@ -83,6 +83,7 @@ local DATABASE_DEFAULTS = {
 		},
 		custom_filters = {},
 		custom_allows = {},
+		sink20OutputSink = "UIErrorsFrame",
 	},
 }
 -- sort by key
@@ -356,6 +357,10 @@ for k, v in pairs(DATABASE_DEFAULTS.profile.allows) do
 end
 
 function addon:SetupOptions()
+	-- LibSink options
+	addon.options.args.output = self:GetSinkAce3OptionsDataTable()
+
+	-- profile options
 	addon.options.args.profile = AceDBOptions:GetOptionsTable(self.db)
 	addon.options.args.profile.order = -2
 
@@ -365,6 +370,7 @@ function addon:SetupOptions()
 	self.optionsFrames.general = AceConfigDialog:AddToBlizOptions(MODNAME, nil, nil, "general")
 	self.optionsFrames.filters = AceConfigDialog:AddToBlizOptions(MODNAME, L["Filter only ..."], MODNAME, "filters")
 	self.optionsFrames.allows = AceConfigDialog:AddToBlizOptions(MODNAME, L["Allow only ..."], MODNAME, "allows")
+	self.optionsFrames.output = AceConfigDialog:AddToBlizOptions(MODNAME, L["Output"], MODNAME, "output")
 	self.optionsFrames.profile = AceConfigDialog:AddToBlizOptions(MODNAME, L["Profiles"], MODNAME, "profile")
 end
 
@@ -376,6 +382,9 @@ function addon:OnInitialize()
 	if not self.db then
 		Print("Error: Database not loaded correctly. Please exit out of WoW and delete ErrorFilter.lua found in: \\World of Warcraft\\WTF\\Account\\<Account Name>>\\SavedVariables\\")
 	end
+
+	-- LibSink options storage
+	self:SetSinkStorage(self.db.profile)
 
 	self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
 	self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
@@ -391,7 +400,7 @@ function addon:OnInitialize()
 
 	-- Register events
 	self:UpdateEvents()
-	
+
 	self:RegisterEvent("PLAYER_REGEN_ENABLED","OnRegenEnable")
 	self:RegisterEvent("PLAYER_REGEN_DISABLED","OnRegenDisable")
 end
@@ -401,7 +410,8 @@ end
 --------------------------------------------------------------------------------------------------------
 function addon:OnErrorMessage(self, event, msg)
 	if (state == OUT_OF_COMBAT) and profileDB.updateOnlyInCombat then
-		UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+		--UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+		addon:Pour(msg, 1.0, 0.1, 0.1)
 		return
 	end
 	if profileDB.mode == FILTER_ONLY then
@@ -415,17 +425,20 @@ function addon:OnErrorMessage(self, event, msg)
 				return
 			end
 		end
-		UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+		--UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+		addon:Pour(msg, 1.0, 0.1, 0.1)
 	elseif profileDB.mode == ALLOW_ONLY then
 		-- check default allows
 		if profileDB.allows[msg] then
-			UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+			--UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+			addon:Pour(msg, 1.0, 0.1, 0.1)
 			return
 		end
 		-- check custom allows
 		for k, v in next, profileDB.custom_allows do
 			if string.find(string.lower(msg), v) then
-				UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+				--UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
+				addon:Pour(msg, 1.0, 0.1, 0.1)
 				return
 			end
 		end
