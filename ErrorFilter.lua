@@ -84,6 +84,7 @@ local DATABASE_DEFAULTS = {
 		custom_filters = {},
 		custom_allows = {},
 		sink20OutputSink = "UIErrorsFrame",
+		throttle = true,
 	},
 }
 -- sort by key
@@ -104,10 +105,13 @@ local FILTER_ONLY = 1
 local ALLOW_ONLY = 2
 local FILTER_ALL = 3
 local REMOVE_FRAME = 4
+local THROTTLE = 5
 
 local IN_COMBAT = 0
 local OUT_OF_COMBAT = 1
 local state = OUT_OF_COMBAT
+
+local lastDisplay = {}
 
 --------------------------------------------------------------------------------------------------------
 --                                   ErrorFilter options panel                                        --
@@ -138,6 +142,7 @@ addon.options = {
 					values = function()
 						return {
 							[DO_NOTHING] = L["Do nothing"],
+							[THROTTLE] = L["Throttle"],
 							[FILTER_ONLY] = L["Filter only ..."],
 							[ALLOW_ONLY] = L["Allow only ..."],
 							[FILTER_ALL] = L["Filter all errors"],
@@ -203,6 +208,26 @@ addon.options = {
 					name = "|cFFFF0202"..L["Warning! This will prevent any message from appearing in the UI Error Frame, including quest updates text."].."|r",
 					hidden = function()
 						return not (profileDB.mode == REMOVE_FRAME)
+					end,
+				},
+				separator1 = {
+					order = 20,
+					type = "description",
+					name = "\n",
+				},
+				throttle = {
+					order = 21,
+					type = "toggle",
+					name = L["Throttle messages."],
+					desc = L["Toggle to allow each message only once every 5 seconds."],
+					get = function()
+						return profileDB.throttle
+					end,
+					set = function(key, value)
+						profileDB.throttle = value
+					end,
+					disabled = function()
+						return (profileDB.mode == DO_NOTHING) or (profileDB.mode == REMOVE_FRAME)
 					end,
 				},
 			},
@@ -409,7 +434,11 @@ end
 --                                       ErrorFilter event handlers                                   --
 --------------------------------------------------------------------------------------------------------
 function addon:OnErrorMessage(self, event, msg)
-	if (state == OUT_OF_COMBAT) and profileDB.updateOnlyInCombat then
+	if profileDB.throttle then
+		if lastDisplay[msg] and (lastDisplay[msg] + 5 > GetTime()) then return end
+		lastDisplay[msg] = GetTime()
+	end
+	if ((state == OUT_OF_COMBAT) and profileDB.updateOnlyInCombat) or (profileDB.mode == THROTTLE) then
 		--UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0);
 		addon:Pour(msg, 1.0, 0.1, 0.1)
 		return
@@ -497,6 +526,9 @@ function addon:UpdateEvents()
 		elseif profileDB.mode == DO_NOTHING then
 			UIErrorsFrame:RegisterEvent("UI_ERROR_MESSAGE")
 			self:UnregisterEvent("UI_ERROR_MESSAGE")
+		elseif profileDB.mode == THROTTLE then
+			UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
+			self:RegisterEvent("UI_ERROR_MESSAGE","OnErrorMessage", self)
 		end
 	end
 end
