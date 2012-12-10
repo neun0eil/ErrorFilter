@@ -1,7 +1,7 @@
-﻿## Interface: 50001
+﻿## Interface: 50100
 ## Title: ErrorFilter
 ## Notes: Filters the errors dislayed in the UIErrorsFrame.
-## Version: 2.6
+## Version: 2.7
 ## Author: iceeagle
 ## OptionalDeps: Ace3, LibSink-2.0
 ## SavedVariables: ErrorFilterDB
