@@ -653,7 +653,7 @@ end
 --------------------------------------------------------------------------------------------------------
 --                                       ErrorFilter event handlers                                   --
 --------------------------------------------------------------------------------------------------------
-function addon:OnErrorMessage(self, event, msg)
+function addon:OnErrorMessage(self, frame, event, msg)
 	if profileDB.throttle then
 		if lastDisplay[msg] and (lastDisplay[msg] + 5 > GetTime()) then return end
 		lastDisplay[msg] = GetTime()
