@@ -88,7 +88,6 @@ local DATABASE_DEFAULTS = {
 			[ERR_USE_BAD_ANGLE] = false,
 			[ERR_USE_CANT_IMMUNE] = false,
 			[ERR_USE_TOO_FAR] = false,
-			[SPELL_FAILED_BAD_IMPLICIT_TARGETS] = true,
 
 			-- Spell failed...
 			[SPELL_FAILED_ABOVE_MAXIMUM_SKILL_RANK] = false,
@@ -783,14 +782,14 @@ end
 --------------------------------------------------------------------------------------------------------
 --                                       ErrorFilter event handlers                                   --
 --------------------------------------------------------------------------------------------------------
-function addon:OnInfoMessage(self, event, messageType, message)
+function addon:OnInfoMessage(event, messageType, message)
 	if (profileDB.q_mode == FILTER_ALL) and ((state == IN_COMBAT) or not profileDB.q_updateOnlyInCombat) then
 		return
 	end
 	addon:OutputMessage(messageType, message, 1.0, 1.0, 0.0)
 end
 
-function addon:OnErrorMessage(self, event, messageType, message)
+function addon:OnErrorMessage(event, messageType, message)
 	if profileDB.throttle then
 		if lastDisplay[message] and (lastDisplay[message] + 5 > GetTime()) then return end
 		lastDisplay[message] = GetTime()
@@ -865,7 +864,7 @@ function addon:UpdateEvents()
 			self:UnregisterEvent("UI_INFO_MESSAGE")
 		else
 			UIErrorsFrame:UnregisterEvent("UI_INFO_MESSAGE")
-			self:RegisterEvent("UI_INFO_MESSAGE","OnInfoMessage", self)
+			self:RegisterEvent("UI_INFO_MESSAGE","OnInfoMessage")
 		end
 		-- ERROR
 		if profileDB.mode == DO_NOTHING then
@@ -873,7 +872,7 @@ function addon:UpdateEvents()
 			self:UnregisterEvent("UI_ERROR_MESSAGE")
 		else
 			UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
-			self:RegisterEvent("UI_ERROR_MESSAGE","OnErrorMessage", self)
+			self:RegisterEvent("UI_ERROR_MESSAGE","OnErrorMessage")
 		end
 	end
 end
